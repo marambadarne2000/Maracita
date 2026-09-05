@@ -18,11 +18,13 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Please sign in before creating a workspace.' }, { status: 401 });
   }
 
-  const body: { businessName?: unknown; businessType?: unknown; phone?: unknown; planCode?: unknown } = await request.json().catch(() => ({}));
+  const body: { businessName?: unknown; businessType?: unknown; phone?: unknown; planCode?: unknown; timezone?: unknown; currency?: unknown } = await request.json().catch(() => ({}));
   const businessName = clean(body?.businessName, 100);
   const businessType = clean(body?.businessType, 80);
   const phone = clean(body?.phone, 30);
   const planCode = clean(body?.planCode, 20);
+  const timezone = clean(body?.timezone, 64) || 'UTC';
+  const currency = clean(body?.currency, 3).toUpperCase() || 'USD';
 
   if (!businessName || !businessType || !phone || !planCodes.has(planCode)) {
     return Response.json({ error: 'Please complete all business details and choose a plan.' }, { status: 400 });
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
     ? decodeURIComponent(encodedName).slice(0, 120)
     : email.split('@')[0].slice(0, 120);
   const now = new Date().toISOString();
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
   const existingAccount = await database.DB
     .prepare('SELECT id FROM accounts WHERE auth_subject = ?')
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
     statements.push(
       database.DB.prepare(
         'INSERT INTO businesses (id, owner_account_id, name, business_type, phone, timezone, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      ).bind(businessId, accountId, businessName, businessType, phone, 'Asia/Jerusalem', 'ILS', 'trial', now, now),
+      ).bind(businessId, accountId, businessName, businessType, phone, timezone, currency, 'trial', now, now),
       database.DB.prepare(
         'INSERT INTO memberships (business_id, account_id, role, created_at) VALUES (?, ?, ?, ?)',
       ).bind(businessId, accountId, 'owner', now),

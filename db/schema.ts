@@ -25,8 +25,8 @@ export const businesses = sqliteTable('businesses', {
   name: text('name').notNull(),
   businessType: text('business_type').notNull(),
   phone: text('phone').notNull(),
-  timezone: text('timezone').notNull().default('Asia/Jerusalem'),
-  currency: text('currency').notNull().default('ILS'),
+  timezone: text('timezone').notNull().default('UTC'),
+  currency: text('currency').notNull().default('USD'),
   status: text('status').notNull().default('trial'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -99,6 +99,59 @@ export const services = sqliteTable('services', {
   updatedAt: updatedAt(),
 }, (table) => [
   index('idx_services_business_active').on(table.businessId, table.active),
+]);
+
+/**
+ * Flow Intelligence starts with explicit availability rules and an opt-in
+ * waitlist. This lets Maracita fill a cancelled slot without guessing about a
+ * customer's availability or sending messages without their permission.
+ */
+export const businessHours = sqliteTable('business_hours', {
+  id: id('id'),
+  businessId: text('business_id').notNull().references(() => businesses.id),
+  weekday: integer('weekday').notNull(),
+  startMinute: integer('start_minute').notNull(),
+  endMinute: integer('end_minute').notNull(),
+  closed: integer('closed', { mode: 'boolean' }).notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  index('idx_business_hours_business_weekday').on(table.businessId, table.weekday),
+]);
+
+export const waitlistEntries = sqliteTable('waitlist_entries', {
+  id: id('id'),
+  businessId: text('business_id').notNull().references(() => businesses.id),
+  customerId: text('customer_id').notNull().references(() => customers.id),
+  staffId: text('staff_id').references(() => staff.id),
+  serviceId: text('service_id').references(() => services.id),
+  requestedDate: text('requested_date'),
+  earliestTime: text('earliest_time'),
+  latestTime: text('latest_time'),
+  contactPreference: text('contact_preference').notNull().default('manual'),
+  status: text('status').notNull().default('waiting'),
+  offeredAppointmentId: text('offered_appointment_id').references(() => appointments.id),
+  offerExpiresAt: text('offer_expires_at'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  index('idx_waitlist_business_status_date').on(table.businessId, table.status, table.requestedDate),
+  index('idx_waitlist_customer_status').on(table.businessId, table.customerId, table.status),
+]);
+
+export const scheduleSignals = sqliteTable('schedule_signals', {
+  id: id('id'),
+  businessId: text('business_id').notNull().references(() => businesses.id),
+  signalDate: text('signal_date').notNull(),
+  signalType: text('signal_type').notNull(),
+  priority: text('priority').notNull().default('normal'),
+  summary: text('summary').notNull(),
+  contextJson: text('context_json').notNull().default('{}'),
+  resolvedAt: text('resolved_at'),
+  createdAt: createdAt(),
+}, (table) => [
+  index('idx_schedule_signals_business_date').on(table.businessId, table.signalDate),
+  index('idx_schedule_signals_open').on(table.businessId, table.resolvedAt),
 ]);
 
 export const appointments = sqliteTable('appointments', {

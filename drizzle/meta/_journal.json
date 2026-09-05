@@ -8,6 +8,20 @@
       "when": 1788598121745,
       "tag": "0000_first_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788599182499,
+      "tag": "0001_spicy_klaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788599232719,
+      "tag": "0002_modern_serpent_society",
+      "breakpoints": true
     }
   ]
 }
