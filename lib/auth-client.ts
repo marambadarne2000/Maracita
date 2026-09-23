@@ -1,0 +1,14 @@
+type Session = { access_token: string; refresh_token?: string; user: { id: string; email?: string; user_metadata?: { full_name?: string } } };
+const storageKey = 'maracita.session';
+const demoToken = 'maracita-portfolio-demo';
+function save(session: Session) { localStorage.setItem(storageKey, JSON.stringify(session)); }
+export function getSession(): Session | null { try { const raw = localStorage.getItem(storageKey); return raw ? JSON.parse(raw) as Session : null; } catch { return null; } }
+export function openPortfolioDemo() { save({ access_token: demoToken, user: { id: 'portfolio-demo', email: 'demo@maracita.local', user_metadata: { full_name: 'Portfolio Explorer' } } }); }
+export async function signOut() { const session = getSession(); localStorage.removeItem(storageKey); if (!session?.access_token) return; try { await fetch('/api/auth/local/signout', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` } }); } catch { /* Local sign-out already completed. */ } }
+async function localAuth(path: 'signup' | 'signin', body: unknown) { const response = await fetch(`/api/auth/local/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const data = await response.json().catch(() => ({})) as Session & { error?: string }; if (!response.ok) throw new Error(data.error || 'Authentication request failed.'); return data; }
+export async function signUp(email: string, password: string, fullName: string) { const data = await localAuth('signup', { email, password, fullName }); if (data.access_token) save(data); return data; }
+export async function signIn(email: string, password: string) { const data = await localAuth('signin', { email, password }); save(data); return data; }
+export async function requestPasswordReset(email: string) { await localAuth('password-reset/request' as 'signup', { email }); }
+export function captureRecoverySession() { const token = new URLSearchParams(window.location.search).get('reset'); if (!token || token.length < 32) return false; sessionStorage.setItem('maracita.password-reset', token); window.history.replaceState({}, '', '/?reset=1'); return true; }
+export async function updatePassword(password: string) { const token = sessionStorage.getItem('maracita.password-reset'); if (!token) throw new Error('This reset link is missing or has expired. Request a new one.'); await localAuth('password-reset/complete' as 'signup', { token, password }); sessionStorage.removeItem('maracita.password-reset'); }
+export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) { const session = getSession(); const headers = new Headers(init.headers); if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`); return fetch(input, { ...init, headers }); }

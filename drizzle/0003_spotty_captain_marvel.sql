@@ -1,0 +1,1 @@
+ALTER TABLE `accounts` ADD `preferred_locale` text DEFAULT 'en' NOT NULL;

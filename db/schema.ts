@@ -15,6 +15,7 @@ export const accounts = sqliteTable('accounts', {
   authSubject: text('auth_subject').notNull().unique(),
   email: text('email').notNull().unique(),
   fullName: text('full_name').notNull(),
+  preferredLocale: text('preferred_locale').notNull().default('en'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -63,6 +64,7 @@ export const customers = sqliteTable('customers', {
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   phone: text('phone').notNull(),
+  nationalId: text('national_id'),
   email: text('email'),
   tags: text('tags').notNull().default(''),
   notes: text('notes').notNull().default(''),
@@ -201,4 +203,36 @@ export const receipts = sqliteTable('receipts', {
   createdAt: createdAt(),
 }, (table) => [
   uniqueIndex('uq_receipts_business_number').on(table.businessId, table.receiptNumber),
+]);
+
+/** A one-time survey link created only after a completed and paid appointment. */
+export const feedbackSurveys = sqliteTable('feedback_surveys', {
+  id: id('id'),
+  businessId: text('business_id').notNull().references(() => businesses.id),
+  appointmentId: text('appointment_id').notNull().unique().references(() => appointments.id),
+  customerId: text('customer_id').notNull().references(() => customers.id),
+  token: text('token').notNull().unique(),
+  status: text('status').notNull().default('pending'),
+  responsesJson: text('responses_json').notNull().default('{}'),
+  completedAt: text('completed_at'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  index('idx_feedback_surveys_business_status').on(table.businessId, table.status),
+  index('idx_feedback_surveys_customer').on(table.businessId, table.customerId),
+]);
+
+/** Private conversation history between a business and one customer. */
+export const customerMessages = sqliteTable('customer_messages', {
+  id: id('id'),
+  businessId: text('business_id').notNull().references(() => businesses.id),
+  customerId: text('customer_id').notNull().references(() => customers.id),
+  authorType: text('author_type').notNull(),
+  body: text('body').notNull().default(''),
+  attachmentName: text('attachment_name'),
+  attachmentType: text('attachment_type'),
+  attachmentData: text('attachment_data'),
+  createdAt: createdAt(),
+}, (table) => [
+  index('idx_customer_messages_business_customer_date').on(table.businessId, table.customerId, table.createdAt),
 ]);

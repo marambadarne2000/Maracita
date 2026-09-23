@@ -1,0 +1,15 @@
+{
+  "name": "maracita",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "dist/client" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "maracita-production",
+      "database_id": "5cb299ad-9506-4dc7-a769-92787e8190d8"
+    }
+  ],
+  "observability": { "enabled": true }
+}

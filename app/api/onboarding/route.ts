@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import type { MaracitaRuntime } from '@/db/client';
+import { authenticatedIdentity } from '@/lib/auth-server';
 
 const planCodes = new Set(['Solo', 'Team', 'Business']);
 const database = env as unknown as MaracitaRuntime;
@@ -9,12 +10,8 @@ function clean(value: unknown, maximum: number) {
 }
 
 export async function POST(request: Request) {
-  const identity = request.headers.get('oai-authenticated-user-id');
-  const email = request.headers.get('oai-authenticated-user-email');
-  const encodedName = request.headers.get('oai-authenticated-user-full-name');
-  const nameEncoding = request.headers.get('oai-authenticated-user-full-name-encoding');
-
-  if (!identity || !email) {
+  const identity = await authenticatedIdentity(request);
+  if (!identity) {
     return Response.json({ error: 'Please sign in before creating a workspace.' }, { status: 401 });
   }
 
@@ -30,15 +27,13 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Please complete all business details and choose a plan.' }, { status: 400 });
   }
 
-  const fullName = nameEncoding === 'percent-encoded-utf-8' && encodedName
-    ? decodeURIComponent(encodedName).slice(0, 120)
-    : email.split('@')[0].slice(0, 120);
+  const fullName = identity.fullName;
   const now = new Date().toISOString();
   const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
   const existingAccount = await database.DB
-    .prepare('SELECT id FROM accounts WHERE auth_subject = ?')
-    .bind(identity)
+    .prepare('SELECT id FROM accounts WHERE auth_subject = ? OR email = ? LIMIT 1')
+    .bind(identity.subject, identity.email.slice(0, 254))
     .first<{ id: string }>();
 
   const accountId = existingAccount?.id ?? crypto.randomUUID();
@@ -47,10 +42,23 @@ export async function POST(request: Request) {
 
   try {
     const statements = [];
-    if (!existingAccount) {
+    if (existingAccount) {
+      // A local-password account may be reclaiming a workspace created before
+      // local authentication existed. Its verified local session proves the email.
+      statements.push(database.DB.prepare(
+        'UPDATE accounts SET auth_subject = ?, full_name = ?, updated_at = ? WHERE id = ?',
+      ).bind(identity.subject, fullName, now, existingAccount.id));
+      const existingWorkspace = await database.DB.prepare(
+        'SELECT b.id, b.name FROM businesses b INNER JOIN memberships m ON m.business_id = b.id WHERE m.account_id = ? ORDER BY b.created_at DESC LIMIT 1',
+      ).bind(existingAccount.id).first<{ id: string; name: string }>();
+      if (existingWorkspace) {
+        await database.DB.batch(statements);
+        return Response.json({ business: { id: existingWorkspace.id, name: existingWorkspace.name, planCode, trialEndsAt }, alreadyExists: true });
+      }
+    } else {
       statements.push(database.DB.prepare(
         'INSERT INTO accounts (id, auth_subject, email, full_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      ).bind(accountId, identity, email.slice(0, 254), fullName, now, now));
+      ).bind(accountId, identity.subject, identity.email.slice(0, 254), fullName, now, now));
     }
     statements.push(
       database.DB.prepare(
