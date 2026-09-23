@@ -21,7 +21,10 @@ export function randomToken() { return randomHex(32); }
 
 async function derive(password: string, salt: string) {
   const material = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: encoder.encode(salt), iterations: 210000 }, material, 256);
+  // Cloudflare Workers supports PBKDF2 up to 100,000 iterations. Keeping the
+  // value at that supported maximum lets the same secure auth flow work in
+  // both local development and the public Worker.
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: encoder.encode(salt), iterations: 100000 }, material, 256);
   return hex(new Uint8Array(bits));
 }
 
