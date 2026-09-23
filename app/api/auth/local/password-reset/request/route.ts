@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { MaracitaRuntime } from '@/db/client';
 import { randomToken, tokenHash } from '@/lib/local-auth';
+import { consumeAuthAttempt } from '@/lib/auth-rate-limit';
 
 const database = env as unknown as MaracitaRuntime;
 const mail = env as unknown as { RESEND_API_KEY?: string; EMAIL_FROM?: string };
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({})) as { email?: unknown };
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
   if (!emailPattern.test(email)) return Response.json({ error: 'Enter a valid email address.' }, { status: 400 });
+  const rate = await consumeAuthAttempt(database, `reset:${email}`, { limit: 3, windowMinutes: 15 });
+  if (!rate.allowed) return Response.json({ error: 'Too many password-reset requests. Please wait before trying again.' }, { status: 429, headers: { 'Retry-After': String(rate.retryAfterSeconds) } });
   const account = await database.DB.prepare('SELECT id, full_name AS fullName FROM accounts WHERE email = ?').bind(email).first<{ id: string; fullName: string }>();
   if (!account) return Response.json({ ok: true });
   if (!mail.RESEND_API_KEY) return Response.json({ error: 'Email delivery is not configured yet.' }, { status: 503 });
