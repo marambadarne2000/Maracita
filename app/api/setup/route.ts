@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const business = await currentBusiness(request);
   if (!business) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const body: { kind?: unknown; name?: unknown; phone?: unknown; email?: unknown; color?: unknown; duration?: unknown; buffer?: unknown; price?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { kind?: unknown; name?: unknown; phone?: unknown; email?: unknown; color?: unknown; duration?: unknown; buffer?: unknown; price?: unknown };
   const kind = clean(body.kind, 20); const name = clean(body.name, 120); const now = new Date().toISOString();
   if (!name) return Response.json({ error: 'A name is required.' }, { status: 400 });
   if (kind === 'staff') {

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const user = await account(request);
   if (!user) return Response.json({ error: 'Account not found.' }, { status: 401 });
-  const body: { locale?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { locale?: unknown };
   const locale = typeof body.locale === 'string' ? body.locale : '';
   if (!locales.has(locale)) return Response.json({ error: 'Unsupported language.' }, { status: 400 });
   await database.DB.prepare('UPDATE accounts SET preferred_locale = ?, updated_at = ? WHERE id = ?').bind(locale, new Date().toISOString(), user.id).run();

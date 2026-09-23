@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     }
     const scores = ['arrival', 'service', 'staff', 'payment', 'location'].map((key) => Number(responses[key])).filter((value) => Number.isFinite(value) && value > 0);
     const average = scores.length ? Math.round((scores.reduce((total, value) => total + value, 0) / scores.length) * 10) / 10 : null;
-    return { ...item, responses, average };
+    return { ...item, status: typeof item.status === 'string' ? item.status : 'pending', responses, average };
   });
   const pending = surveys.filter((survey) => survey.status === 'pending').length;
   const completed = surveys.filter((survey) => survey.status === 'completed').length;

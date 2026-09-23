@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const business = await businessId(request);
   if (!business) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const body: { firstName?: unknown; lastName?: unknown; phone?: unknown; nationalId?: unknown; email?: unknown; tags?: unknown; notes?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { firstName?: unknown; lastName?: unknown; phone?: unknown; nationalId?: unknown; email?: unknown; tags?: unknown; notes?: unknown };
   const firstName = clean(body.firstName, 80); const lastName = clean(body.lastName, 80); const phone = clean(body.phone, 30);
   if (!firstName || !lastName || !phone) return Response.json({ error: 'First name, last name and phone are required.' }, { status: 400 });
   const id = crypto.randomUUID(); const now = new Date().toISOString();

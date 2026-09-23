@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Please sign in before creating a workspace.' }, { status: 401 });
   }
 
-  const body: { businessName?: unknown; businessType?: unknown; phone?: unknown; planCode?: unknown; timezone?: unknown; currency?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { businessName?: unknown; businessType?: unknown; phone?: unknown; planCode?: unknown; timezone?: unknown; currency?: unknown };
   const businessName = clean(body?.businessName, 100);
   const businessType = clean(body?.businessType, 80);
   const phone = clean(body?.phone, 30);

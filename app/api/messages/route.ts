@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const business = await workspace(request);
   if (!business) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const body: { customerId?: unknown; message?: unknown; attachment?: unknown; delivery?: unknown; subject?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { customerId?: unknown; message?: unknown; attachment?: unknown; delivery?: unknown; subject?: unknown };
   const customerId = typeof body.customerId === 'string' ? body.customerId : '';
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, 5000) : '';
   const delivery = body.delivery === 'email' ? 'email' : 'internal';

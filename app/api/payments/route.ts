@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const workspace = await business(request);
   if (!workspace) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const body: { customerId?: unknown; appointmentId?: unknown; amount?: unknown; installments?: unknown; method?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { customerId?: unknown; appointmentId?: unknown; amount?: unknown; installments?: unknown; method?: unknown };
   const customerId = typeof body.customerId === 'string' ? body.customerId : ''; const appointmentId = typeof body.appointmentId === 'string' ? body.appointmentId : '';
   const amount = Number(body.amount); const installments = Number(body.installments); const method = typeof body.method === 'string' ? body.method.slice(0, 30) : 'manual';
   if (!customerId || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(installments) || installments < 1 || installments > 6) return Response.json({ error: 'Choose a customer, amount and 1–6 installments.' }, { status: 400 });

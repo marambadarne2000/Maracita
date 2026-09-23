@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const business = await businessId(request);
   if (!business) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const body: { customerId?: unknown; staffId?: unknown; serviceId?: unknown; startsAt?: unknown; notes?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { customerId?: unknown; staffId?: unknown; serviceId?: unknown; startsAt?: unknown; notes?: unknown };
   const customerId = typeof body.customerId === 'string' ? body.customerId : ''; const staffId = typeof body.staffId === 'string' ? body.staffId : ''; const serviceId = typeof body.serviceId === 'string' ? body.serviceId : '';
   const startsAt = typeof body.startsAt === 'string' ? new Date(body.startsAt) : new Date('invalid');
   if (!customerId || !staffId || !serviceId || Number.isNaN(startsAt.getTime())) return Response.json({ error: 'Choose customer, team member, service and start time.' }, { status: 400 });
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const business = await businessId(request);
   if (!business) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const body: { id?: unknown; status?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { id?: unknown; status?: unknown };
   const id = typeof body.id === 'string' ? body.id : '';
   const status = ['scheduled', 'confirmed', 'arrived', 'completed', 'cancelled', 'no_show'].includes(String(body.status)) ? String(body.status) : '';
   if (!id || !status) return Response.json({ error: 'Select a valid appointment status.' }, { status: 400 });

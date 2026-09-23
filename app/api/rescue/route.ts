@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   const business = await businessId(request);
   if (!business) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const body: { id?: unknown } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({})) as { id?: unknown };
   const id = typeof body.id === 'string' ? body.id : '';
   if (!id) return Response.json({ error: 'Choose a rescue item.' }, { status: 400 });
   const result = await database.DB.prepare('UPDATE schedule_signals SET resolved_at = ? WHERE id = ? AND business_id = ? AND resolved_at IS NULL').bind(new Date().toISOString(), id, business).run();
