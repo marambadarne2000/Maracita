@@ -24,10 +24,8 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-      - name: Install Chrome for browser automation
-        uses: browser-actions/setup-chrome@v1
-      - name: Install matching ChromeDriver
-        uses: browser-actions/setup-chromedriver@v1
+      - name: Verify Chrome is available
+        run: google-chrome --version
       - name: Run Selenium browser automation
         working-directory: qa/selenium-java
         run: mvn -B test -Dmaracita.baseUrl=https://maracita.awadi-mar34.workers.dev
