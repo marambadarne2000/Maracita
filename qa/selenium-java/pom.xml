@@ -7,5 +7,8 @@
     <dependency><groupId>org.seleniumhq.selenium</groupId><artifactId>selenium-java</artifactId><version>${selenium.version}</version></dependency>
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version><scope>test</scope></dependency>
   </dependencies>
-  <build><plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.2</version><configuration><systemPropertyVariables><maracita.baseUrl>${maracita.baseUrl}</maracita.baseUrl></systemPropertyVariables></configuration></plugin></plugins></build>
+  <build><plugins>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version><configuration><release>${maven.compiler.release}</release></configuration></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.2</version><configuration><systemPropertyVariables><maracita.baseUrl>${maracita.baseUrl}</maracita.baseUrl></systemPropertyVariables></configuration></plugin>
+  </plugins></build>
 </project>
