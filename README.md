@@ -78,6 +78,10 @@ npm run build
 
 GitHub Actions runs this build on every push and pull request.
 
+## Browser automation
+
+The repository includes a real Selenium + Java WebDriver suite in [`qa/selenium-java`](./qa/selenium-java). It opens the deployed product in headless Chrome and verifies the public landing page plus the portfolio-demo workspace flow. GitHub Actions runs it automatically on every push and pull request.
+
 ## License
 
 Copyright © 2026 Maram Abbas. All rights reserved. This repository is shared for portfolio review only; reuse, redistribution and commercial use require written permission.
