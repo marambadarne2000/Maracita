@@ -80,7 +80,7 @@ GitHub Actions runs this build on every push and pull request.
 
 ## Browser automation
 
-The repository includes a real Selenium + Java WebDriver suite in [`qa/selenium-java`](./qa/selenium-java). It opens the deployed product in headless Chrome and verifies the public landing page plus the portfolio-demo workspace flow. GitHub Actions runs it automatically on every push and pull request.
+The repository includes a Selenium + Java WebDriver test example in [`qa/selenium-java`](./qa/selenium-java), alongside separate manual QA test cases and report templates in [`qa/manual`](./qa/manual). They are portfolio artifacts: the Selenium suite is intentionally not run automatically by the application CI.
 
 ## License
 

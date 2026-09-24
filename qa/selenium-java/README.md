@@ -15,4 +15,4 @@ cd qa/selenium-java
 mvn test -Dmaracita.baseUrl=https://maracita.awadi-mar34.workers.dev
 ```
 
-Selenium Manager resolves the compatible Chrome WebDriver automatically. The same suite runs in GitHub Actions on every push and pull request.
+Selenium Manager resolves the compatible Chrome WebDriver automatically. This suite is kept as a clear, runnable QA code example and is intentionally separate from the application's build workflow.
