@@ -5,16 +5,16 @@ import { authenticatedIdentity } from '@/lib/auth-server';
 const database = env as unknown as MaracitaRuntime;
 const ids = { account: 'demo-account', business: 'demo-business', staff: 'demo-staff', service: 'demo-service', customer: 'demo-customer', appointment: 'demo-appointment', payment: 'demo-payment' };
 
-export async function POST(request: Request) {
+export async function POST(request: Request) {await request.arrayBuffer().catch(()=>{});if((env as unknown as {ALLOW_DEMO?:string}).ALLOW_DEMO!=='1')return Response.json({error:'Demo is disabled. Sign in to your own business.'},{status:403});
   const identity = await authenticatedIdentity(request);
   if (!identity || identity.subject !== 'demo:portfolio') return Response.json({ error: 'Demo access is required.' }, { status: 401 });
   const now = new Date().toISOString(); const start = new Date(Date.now() + 60 * 60 * 1000).toISOString(); const end = new Date(Date.now() + 90 * 60 * 1000).toISOString();
   try {
     await database.DB.batch([
       database.DB.prepare('INSERT OR IGNORE INTO accounts (id, auth_subject, email, full_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').bind(ids.account, identity.subject, identity.email, identity.fullName, now, now),
-      database.DB.prepare('INSERT OR IGNORE INTO businesses (id, owner_account_id, name, business_type, phone, timezone, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(ids.business, ids.account, 'Luma Studio', 'Beauty & wellness', '+1 555 014 210', 'UTC', 'USD', 'trial', now, now),
+      database.DB.prepare('INSERT OR IGNORE INTO businesses (id, owner_account_id, name, business_type, phone, timezone, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(ids.business, ids.account, 'Luma Studio', 'Beauty & wellness', '+1 555 014 210', 'UTC', 'USD', 'active', now, now),
       database.DB.prepare('INSERT OR IGNORE INTO memberships (business_id, account_id, role, created_at) VALUES (?, ?, ?, ?)').bind(ids.business, ids.account, 'owner', now),
-      database.DB.prepare('INSERT OR IGNORE INTO subscriptions (id, business_id, plan_code, status, trial_ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind('demo-subscription', ids.business, 'Team', 'trialing', new Date(Date.now() + 3 * 86400000).toISOString(), now, now),
+      database.DB.prepare('INSERT OR IGNORE INTO subscriptions (id, business_id, plan_code, status, trial_ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind('demo-subscription', ids.business, 'Free', 'active', null, now, now),
       database.DB.prepare('INSERT OR IGNORE INTO staff (id, business_id, full_name, phone, email, calendar_color, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(ids.staff, ids.business, 'Sofia Lane', '+1 555 010 110', 'sofia@luma.example', '#c9f66b', 1, now, now),
       database.DB.prepare('INSERT OR IGNORE INTO services (id, business_id, name, duration_minutes, buffer_minutes, price_agorot, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(ids.service, ids.business, 'Signature treatment', 30, 10, 8500, 1, now, now),
       database.DB.prepare('INSERT OR IGNORE INTO customers (id, business_id, first_name, last_name, phone, email, national_id, tags, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(ids.customer, ids.business, 'Maya', 'Cohen', '+1 555 019 343', 'maya@example.com', 'DEMO-1001', 'VIP, returning', 'Portfolio demo record only.', now, now),

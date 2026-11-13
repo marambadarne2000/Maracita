@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { MaracitaRuntime } from '@/db/client';
 import { authenticatedIdentity } from '@/lib/auth-server';
-import { sendEmail } from '@/lib/email';
+import { sendBusinessEmail } from '@/lib/business-email';
 
 const database = env as unknown as MaracitaRuntime;
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (!visit) await database.DB.prepare("INSERT INTO general_feedback_surveys (id, business_id, customer_id, token, status, responses_json, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', '{}', ?, ?)").bind(crypto.randomUUID(), business.id, customer.id, token, now, now).run();
   const link = `${new URL(request.url).origin}/feedback/${token}`;
   const subject = visit ? `How was your ${visit.serviceName} visit?` : `How was your experience with ${business.name}?`;
-  const email = await sendEmail(recipient, subject, `Hello ${visit?.firstName ?? customer.firstName},\n\nThank you for choosing ${business.name}. Please share your experience in this private form — it takes less than a minute:\n\n${link}\n\nYour answers go directly to ${business.name} and help improve the service.`);
+  const email = await sendBusinessEmail(business.id,recipient, subject, `Hello ${visit?.firstName ?? customer.firstName},\n\nThank you for choosing ${business.name}. Please share your experience in this private form — it takes less than a minute:\n\n${link}\n\nYour answers go directly to ${business.name} and help improve the service.`);
   if (!email.ok) return Response.json({ error: `${email.error} The form was created but no email was sent.` }, { status: 502 });
   await database.DB.prepare('INSERT INTO customer_messages (id, business_id, customer_id, author_type, body, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), business.id, customer.id, 'business_email', visit ? `Feedback form sent for completed ${visit.serviceName} visit.` : 'General feedback form sent.', now).run();
   return Response.json({ ok: true, link });

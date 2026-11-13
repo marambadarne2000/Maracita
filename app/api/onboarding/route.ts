@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import type { MaracitaRuntime } from '@/db/client';
 import { authenticatedIdentity } from '@/lib/auth-server';
 
-const planCodes = new Set(['Solo', 'Team', 'Business']);
+
 const database = env as unknown as MaracitaRuntime;
 
 function clean(value: unknown, maximum: number) {
@@ -19,17 +19,17 @@ export async function POST(request: Request) {
   const businessName = clean(body?.businessName, 100);
   const businessType = clean(body?.businessType, 80);
   const phone = clean(body?.phone, 30);
-  const planCode = clean(body?.planCode, 20);
+  const planCode = 'Free';
   const timezone = clean(body?.timezone, 64) || 'UTC';
   const currency = clean(body?.currency, 3).toUpperCase() || 'USD';
 
-  if (!businessName || !businessType || !phone || !planCodes.has(planCode)) {
-    return Response.json({ error: 'Please complete all business details and choose a plan.' }, { status: 400 });
+  if (!businessName || !businessType || !phone) {
+    return Response.json({ error: 'Please complete all business details.' }, { status: 400 });
   }
 
   const fullName = identity.fullName;
   const now = new Date().toISOString();
-  const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+  const trialEndsAt = null;
 
   const existingAccount = await database.DB
     .prepare('SELECT id FROM accounts WHERE auth_subject = ? OR email = ? LIMIT 1')
@@ -63,13 +63,13 @@ export async function POST(request: Request) {
     statements.push(
       database.DB.prepare(
         'INSERT INTO businesses (id, owner_account_id, name, business_type, phone, timezone, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      ).bind(businessId, accountId, businessName, businessType, phone, timezone, currency, 'trial', now, now),
+      ).bind(businessId, accountId, businessName, businessType, phone, timezone, currency, 'active', now, now),
       database.DB.prepare(
         'INSERT INTO memberships (business_id, account_id, role, created_at) VALUES (?, ?, ?, ?)',
       ).bind(businessId, accountId, 'owner', now),
       database.DB.prepare(
         'INSERT INTO subscriptions (id, business_id, plan_code, status, trial_ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      ).bind(subscriptionId, businessId, planCode, 'trialing', trialEndsAt, now, now),
+      ).bind(subscriptionId, businessId, planCode, 'active', trialEndsAt, now, now),
     );
     await database.DB.batch(statements);
   } catch (error) {

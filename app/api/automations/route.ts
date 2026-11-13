@@ -1,0 +1,5 @@
+import { currentBusiness,database,failure } from '@/lib/scheduling';
+import { connectionFor } from '@/lib/connections';
+import { processOffers } from '@/lib/slot-filler';
+export async function GET(request:Request){try{const business=await currentBusiness(request);const offers=await database.DB.prepare('SELECT o.id,o.status,o.delivery_status AS deliveryStatus,o.channel,o.starts_at AS startsAt,o.expires_at AS expiresAt,c.first_name||\' \'||c.last_name AS customerName,s.name AS serviceName FROM waitlist_offers o JOIN customers c ON c.id=o.customer_id JOIN services s ON s.id=o.service_id WHERE o.business_id=? ORDER BY o.created_at DESC LIMIT 60').bind(business.id).all();return Response.json({offers:offers.results,aiConnected:Boolean(await connectionFor(business.id,'ai'))});}catch(error){return failure(error);}}
+export async function POST(request:Request){try{const business=await currentBusiness(request);return Response.json({results:await processOffers(business.id,new URL(request.url).origin)});}catch(error){return failure(error);}}

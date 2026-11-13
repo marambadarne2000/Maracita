@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   if (!identity) return Response.json({ error: 'Please sign in to view your workspace.' }, { status: 401 });
 
   const workspace = await database.DB.prepare(
-    'SELECT b.id, b.name, b.business_type AS businessType, b.currency, b.timezone, b.status, s.plan_code AS planCode, s.trial_ends_at AS trialEndsAt FROM businesses b INNER JOIN memberships m ON m.business_id = b.id INNER JOIN accounts a ON a.id = m.account_id LEFT JOIN subscriptions s ON s.business_id = b.id WHERE a.auth_subject = ? ORDER BY b.created_at DESC LIMIT 1',
+    'SELECT b.id, b.name, b.business_type AS businessType, b.currency, b.timezone, b.status, bc.business_number AS businessNumber, bc.city, s.plan_code AS planCode, s.trial_ends_at AS trialEndsAt FROM businesses b INNER JOIN memberships m ON m.business_id = b.id INNER JOIN accounts a ON a.id = m.account_id LEFT JOIN subscriptions s ON s.business_id = b.id LEFT JOIN business_credentials bc ON bc.business_id = b.id WHERE a.auth_subject = ? ORDER BY b.created_at DESC LIMIT 1',
   ).bind(identity.subject).first<{ id: string; name: string; businessType: string; currency: string; timezone: string; status: string; planCode: string | null; trialEndsAt: string | null }>();
 
   if (!workspace) return Response.json({ workspace: null });

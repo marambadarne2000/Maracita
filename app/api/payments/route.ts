@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { MaracitaRuntime } from '@/db/client';
 import { authenticatedIdentity } from '@/lib/auth-server';
-import { sendEmail } from '@/lib/email';
+import { sendBusinessEmail } from '@/lib/business-email';
 
 const database = env as unknown as MaracitaRuntime;
 
@@ -33,11 +33,9 @@ export async function POST(request: Request) {
   if (!customer) return Response.json({ error: 'Customer is not available.' }, { status: 400 });
   if (appointmentId) { const booking = await database.DB.prepare('SELECT id FROM appointments WHERE id = ? AND business_id = ? AND customer_id = ?').bind(appointmentId, workspace.id, customerId).first(); if (!booking) return Response.json({ error: 'Appointment does not belong to this customer.' }, { status: 400 }); }
   const now = new Date().toISOString(); const paymentId = crypto.randomUUID(); const receiptId = crypto.randomUUID();
-  const last = await database.DB.prepare('SELECT COUNT(*) AS count FROM receipts WHERE business_id = ?').bind(workspace.id).first<{ count: number }>();
-  const receiptNumber = String((last?.count ?? 0) + 1).padStart(6, '0');
   await database.DB.batch([
     database.DB.prepare('INSERT INTO payments (id, business_id, appointment_id, customer_id, amount_agorot, currency, installments, status, provider, paid_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(paymentId, workspace.id, appointmentId || null, customerId, Math.round(amount * 100), workspace.currency, installments, 'paid', `local-${method}`, now, now, now),
-    database.DB.prepare('INSERT INTO receipts (id, business_id, payment_id, receipt_number, issued_at, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(receiptId, workspace.id, paymentId, receiptNumber, now, now),
+    database.DB.prepare('INSERT INTO receipts (id, business_id, payment_id, receipt_number, issued_at, created_at) SELECT ?,?,?,printf(\'%06d\',COALESCE(MAX(CAST(receipt_number AS INTEGER)),0)+1),?,? FROM receipts WHERE business_id=?').bind(receiptId, workspace.id, paymentId, now, now, workspace.id),
   ]);
   // A payment can be recorded after the visit has already been marked complete.
   // In that order, create the same one-time feedback request here.
@@ -48,9 +46,9 @@ export async function POST(request: Request) {
       const created = await database.DB.prepare("INSERT OR IGNORE INTO feedback_surveys (id, business_id, appointment_id, customer_id, token, status, responses_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', '{}', ?, ?)").bind(crypto.randomUUID(), workspace.id, visit.id, visit.customerId, token, now, now).run();
       if (created.meta.changes && visit.email) {
         const link = `${new URL(request.url).origin}/feedback/${token}`;
-        await sendEmail(visit.email, `How was your ${visit.serviceName} visit?`, `Hello ${visit.firstName},\n\nThank you for choosing ${visit.businessName}. We would value your feedback about your ${visit.serviceName} visit. It takes less than a minute.\n\n${link}\n\nThank you!`);
+        await sendBusinessEmail(workspace.id,visit.email, `How was your ${visit.serviceName} visit?`, `Hello ${visit.firstName},\n\nThank you for choosing ${visit.businessName}. We would value your feedback about your ${visit.serviceName} visit. It takes less than a minute.\n\n${link}\n\nThank you!`);
       }
     }
   }
-  return Response.json({ paymentId, receiptNumber }, { status: 201 });
+  const receipt=await database.DB.prepare('SELECT receipt_number AS number FROM receipts WHERE id=? AND business_id=?').bind(receiptId,workspace.id).first<{number:string}>();return Response.json({ paymentId, receiptNumber:receipt?.number }, { status: 201 });
 }

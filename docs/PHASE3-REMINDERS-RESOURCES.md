@@ -1,0 +1,9 @@
+# Reminders and resource dependencies
+
+Reminders are disabled by default. Configure Resend email or Twilio SMS under Connections, then use Reminders to set the lead time and record customer consent. No reminders are sent without an enabled policy, saved provider and matching permission. SMS numbers must use +country-code format. Saving a connection does not prove delivery. The worker scans every minute locally and every five minutes on deployment. Submitted means accepted by the provider, not delivered. A unique appointment/time/channel ledger prevents concurrent duplicate submissions. Failed, uncertain or interrupted attempts require manual provider review and are not retried automatically. Rescheduled times become independently eligible. Preview pages never send messages.
+
+Room and equipment resources are assigned explicitly to services. Every assigned resource is required, capacity one, including the service buffer. Staff, rooms and devices are validated together through the shared availability engine and database triggers. Different staff cannot book overlapping services that share a room or device. Cancelled and no-show appointments release the resources. Disabling a resource blocks new bookings; the owner must review existing appointments. Requirement changes are refused while the service has upcoming active bookings so resource assignment cannot rewrite existing reservations. Alternative pools, resource-specific schedules and maintenance date ranges are not implemented; use named resources and the availability toggle.
+
+Local setup: run the build, npm run db:upgrade, then restart. Migration 0016 is idempotent. Production must apply the same migration before use; this update does not deploy or provision provider accounts.
+
+Twilio API reference: https://www.twilio.com/docs/messaging/api/message-resource

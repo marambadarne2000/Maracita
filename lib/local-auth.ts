@@ -1,3 +1,4 @@
+import {scrypt} from 'node:crypto';
 import type { MaracitaRuntime } from '@/db/client';
 
 const encoder = new TextEncoder();
@@ -28,25 +29,14 @@ async function derive(password: string, salt: string) {
   return hex(new Uint8Array(bits));
 }
 
-export async function passwordHash(password: string) {
-  const salt = randomHex(16);
-  return `${salt}.${await derive(password, salt)}`;
-}
-
-export async function passwordMatches(password: string, stored: string | null) {
-  const [salt, expected] = (stored || '').split('.');
-  if (!salt || !expected) return false;
-  const actual = await derive(password, salt);
-  if (actual.length !== expected.length) return false;
-  let different = 0;
-  for (let index = 0; index < actual.length; index += 1) different |= actual.charCodeAt(index) ^ expected.charCodeAt(index);
-  return different === 0;
-}
+async function scryptHash(password:string,salt:string){return new Promise<string>((resolve,reject)=>scrypt(password,salt,32,{N:32768,r:8,p:3,maxmem:64*1024*1024},(error,key)=>error?reject(error):resolve(key.toString('hex'))));}
+export async function passwordHash(password:string){const salt=randomHex(16);return `scrypt$32768$8$3$${salt}$${await scryptHash(password,salt)}`;}
+export async function passwordMatches(password:string,stored:string|null){if(!stored)return false;let expected:string,actual:string;if(stored.startsWith('scrypt$')){const parts=stored.split('$');if(parts.length!==6||parts.slice(1,4).join('$')!=='32768$8$3'||!/^[a-f0-9]{32}$/.test(parts[4])||!/^[a-f0-9]{64}$/.test(parts[5]))return false;expected=parts[5];actual=await scryptHash(password,parts[4]);}else{const [salt,hash]=stored.split('.');if(!salt||!hash)return false;expected=hash;actual=await derive(password,salt);}if(actual.length!==expected.length)return false;let diff=0;for(let i=0;i<actual.length;i++)diff|=actual.charCodeAt(i)^expected.charCodeAt(i);return diff===0;}
 
 export async function createSession(database: MaracitaRuntime, accountId: string) {
   const token = randomHex(32);
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
   await database.DB.prepare('INSERT INTO auth_sessions (id, account_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), accountId, await tokenHash(token), expiresAt, now.toISOString()).run();
   return token;
 }

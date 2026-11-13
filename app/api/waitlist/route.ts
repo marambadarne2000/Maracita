@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const requestedDate = typeof body.requestedDate === 'string' ? body.requestedDate : '';
   const earliestTime = typeof body.earliestTime === 'string' ? body.earliestTime : '';
   const latestTime = typeof body.latestTime === 'string' ? body.latestTime : '';
-  const contactPreference = ['manual', 'email', 'phone'].includes(String(body.contactPreference)) ? String(body.contactPreference) : 'manual';
+  const contactPreference = ['manual', 'email', 'phone', 'whatsapp'].includes(String(body.contactPreference)) ? String(body.contactPreference) : 'manual';
   if (!customerId || !validDate(requestedDate) || !validTime(earliestTime) || !validTime(latestTime) || (earliestTime && latestTime && earliestTime > latestTime)) return Response.json({ error: 'Choose a customer and provide a valid preferred date or time window.' }, { status: 400 });
   const [customer, staff, service] = await database.DB.batch([
     database.DB.prepare('SELECT id FROM customers WHERE id = ? AND business_id = ?').bind(customerId, business),

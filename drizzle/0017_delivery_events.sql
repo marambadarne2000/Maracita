@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS provider_delivery_events(connection_id TEXT NOT NULL REFERENCES integrations(id),business_id TEXT NOT NULL REFERENCES businesses(id),event_id TEXT NOT NULL,provider_message_id TEXT NOT NULL,status TEXT NOT NULL,occurred_at TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(connection_id,event_id));
+CREATE INDEX IF NOT EXISTS provider_delivery_lookup ON provider_delivery_events(connection_id,provider_message_id,occurred_at);

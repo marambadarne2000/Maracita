@@ -1,0 +1,39 @@
+import {fileURLToPath} from 'node:url';
+import fs from 'node:fs';import assert from 'node:assert/strict';import {createRequire} from 'node:module';
+const root=fileURLToPath(new URL('../../',import.meta.url)),ts=createRequire(root+'package.json')('typescript');let checks=0;class ScheduleError extends Error{constructor(m,status=400){super(m);this.status=status;}}
+function ok(n,v){assert.ok(v,n);checks++;console.log('PASS',n);}async function reject(n,fn,p){await assert.rejects(fn,p);checks++;console.log('PASS',n);}
+async function load(file,prefix){let s=fs.readFileSync(root+file,'utf8').replace(/^import .*?;\r?\n/gm,'');return import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(prefix+'\n'+s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText).toString('base64'));}
+globalThis.trialFixture={ScheduleError};const policy=await load('lib/trial-messaging.ts','const {ScheduleError}=globalThis.trialFixture;');Object.assign(globalThis.trialFixture,policy);
+const to='+12025550123',expires=new Date(Date.now()+86400000).toISOString(),base={trialMode:true,sandboxConfirmed:true,testRecipients:[to],trialExpiresAt:expires,token:'fixture-token',sender:'+12025550124',apiVersion:'v99.0'};
+ok('Verified test recipients are deduplicated',policy.trialRecipients(to+'\n'+to).length===1);
+assert.throws(()=>policy.trialRecipients('+123'),/1–5/);ok('Invalid recipient format rejected',true);
+assert.throws(()=>policy.trialRecipients(Array.from({length:6},(_,i)=>'+1202555012'+i)),/1–5/);ok('More than five recipients rejected',true);
+assert.throws(()=>policy.trialConfig({testRecipients:to,trialExpiresAt:expires}),/Confirm/);ok('Free trial confirmation required',true);
+assert.throws(()=>policy.trialConfig({sandboxConfirmed:true,testRecipients:to,trialExpiresAt:new Date(Date.now()+31*86400000).toISOString()}),/30 days/);ok('Trial configuration cannot exceed thirty days',true);
+ok('Valid config always enforces trial mode',policy.trialConfig({sandboxConfirmed:true,testRecipients:to,trialExpiresAt:expires}).trialMode);
+assert.throws(()=>policy.assertTrialSend(base,to,false),/test-only/);ok('All automatic sends blocked',true);
+assert.throws(()=>policy.assertTrialSend(base,'+12025550999',true),/recipient/);ok('Unlisted recipients blocked',true);
+assert.throws(()=>policy.assertTrialSend({...base,trialExpiresAt:'2000-01-01'},to,true),/expired/);ok('Expired trial blocked',true);
+assert.throws(()=>policy.assertTrialSend({...base,trialMode:false},to,true),/free trial/);ok('Unconfigured or paid mode cannot send',true);
+globalThis.trialFixture.env={INTEGRATIONS_ENCRYPTION_KEY:'b'.repeat(64)};globalThis.trialFixture.database={};
+const connectionModule=await load('lib/connections.ts','const {ScheduleError,assertTrialSend,assertTwilioTrial,assertMetaSandbox,env,database}=globalThis.trialFixture;');
+const sid='AC'+'a'.repeat(32),connection={id:'trial',businessId:'business',channel:'sms',externalAccountId:sid,encryptedConfig:await connectionModule.seal(base,'business','sms'),enabled:1};let metaMode='SANDBOX';let type='Full',active=true,networkError=false;const requests=[];
+globalThis.fetch=async(url,init={})=>{requests.push({url,method:init.method||'GET',body:init.body});if(networkError)throw Error('fixture network');if(url.endsWith('/Accounts/'+sid+'.json'))return Response.json({sid,type,status:active?'active':'suspended',owner_account_sid:sid});if(url.includes('account_mode'))return Response.json({id:'123456',account_mode:metaMode});return Response.json(url.includes('twilio')?{sid:'SMfixture'}:{messages:[{id:'WAfixture'}]});};
+await reject('Paid Twilio account blocked before POST',()=>connectionModule.providerSend(connection,to,'anything',{manualTest:true}),/Trial account/);ok('Paid Twilio account sends zero messages',requests.every(r=>r.method==='GET'));
+type='Trial';active=false;await reject('Suspended trial blocked',()=>connectionModule.providerSend(connection,to,'anything',{manualTest:true}),/Trial account/);active=true;networkError=true;await reject('Unverifiable trial fails closed',()=>connectionModule.providerSend(connection,to,'anything',{manualTest:true}),/No SMS/);networkError=false;
+const sms=await connectionModule.providerSend(connection,to,'arbitrary customer content',{manualTest:true});ok('Active Twilio trial can submit manual test',sms==='SMfixture');const post=requests.find(r=>r.method==='POST');ok('SMS sends only provider trial example',post.body.get('Body')==='sms_appointment_reminders');
+const prior=requests.length;await reject('Reminder path without manual flag cannot contact provider',()=>connectionModule.providerSend(connection,to,'reminder'),/test-only/);ok('Automatic send did not issue any request',requests.length===prior);
+const wa={...connection,channel:'whatsapp',externalAccountId:'123456',encryptedConfig:await connectionModule.seal(base,'business','whatsapp')};metaMode='LIVE';await reject('Meta live number blocked before message POST',()=>connectionModule.providerSend(wa,to,'ignored',{manualTest:true}),/SANDBOX/);metaMode='';await reject('Missing Meta sandbox proof blocks sending',()=>connectionModule.providerSend(wa,to,'ignored',{manualTest:true}),/SANDBOX/);metaMode='SANDBOX';ok('Meta test submits sample template',await connectionModule.providerSend(wa,to,'ignored',{manualTest:true})==='WAfixture');const waPayload=JSON.parse(requests.at(-1).body);ok('WhatsApp uses hello_world with no customer content',waPayload.type==='template'&&waPayload.template.name==='hello_world'&&!waPayload.text);
+await reject('WhatsApp automatic offers blocked',()=>connectionModule.providerSend(wa,to,'offer',{template:true}),/test-only/);
+let authorized=false,allowed=true,submissions=0;const seen=new Set();globalThis.testRouteFixture={ScheduleError,currentBusiness:async()=>{if(!authorized)throw new ScheduleError('Sign in',401);return {id:'business'};},body:async r=>r.json(),clean:(v,n)=>typeof v==='string'?v.trim().slice(0,n):'',failure:e=>Response.json({error:e.message},{status:e.status||500}),connectionFor:async(b,c)=>({...connection,businessId:b,channel:c}),consumeAuthAttempt:async()=>({allowed}),providerSend:async(c,t,m,o)=>{assert.equal(o.manualTest,true);submissions++;return 'fixture';},database:{DB:{prepare:()=>({bind:(c,id)=>({run:async()=>{if(seen.has(id))throw Error('UNIQUE constraint');seen.add(id);}})})}}};
+const route=await load('app/api/integrations/test/route.ts','const {ScheduleError,currentBusiness,body,clean,failure,connectionFor,consumeAuthAttempt,providerSend,database}=globalThis.testRouteFixture;');
+const request=(overrides={},origin='https://app.example.invalid')=>new Request('https://app.example.invalid/api/integrations/test',{method:'POST',headers:{origin},body:JSON.stringify({channel:'sms',to,confirmed:true,requestId:'11111111-1111-4111-8111-111111111111',...overrides})});
+ok('Anonymous test requests rejected',(await route.POST(request())).status===401&&submissions===0);authorized=true;
+ok('Cross-origin test requests rejected',(await route.POST(request({},'https://attacker.invalid'))).status===403&&submissions===0);
+ok('Recipient consent required',(await route.POST(request({confirmed:false}))).status===400&&submissions===0);
+ok('Other channels cannot use trial test endpoint',(await route.POST(request({channel:'email'}))).status===400);
+allowed=false;ok('Test rate limit prevents submission',(await route.POST(request())).status===429&&submissions===0);allowed=true;
+ok('Authorized confirmed manual test submitted',(await route.POST(request())).status===200&&submissions===1);
+ok('Replayed test request cannot send twice',(await route.POST(request())).status===409&&submissions===1);
+fs.writeFileSync(new URL('./results/trial-messaging.json',import.meta.url),JSON.stringify({checks,liveMessagesSent:0,providerCalls:'mocked'},null,2));
+

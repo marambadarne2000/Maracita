@@ -1,0 +1,2 @@
+import {connectionFor,providerSend} from '@/lib/connections';
+export async function sendBusinessEmail(businessId:string,to:string,subject:string,message:string){try{const connection=await connectionFor(businessId,'email');if(!connection)return {ok:false,error:'Configure the business email provider in Connections.'};const id=await providerSend(connection,to,message,{subject});return {ok:true,id};}catch(e){return {ok:false,error:e instanceof Error?e.message:'Email submission failed.'};}}

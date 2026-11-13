@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS reminder_settings(business_id TEXT PRIMARY KEY REFERENCES businesses(id),enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN(0,1)),channel TEXT NOT NULL DEFAULT 'email' CHECK(channel IN('email','sms')),lead_minutes INTEGER NOT NULL DEFAULT 1440 CHECK(lead_minutes BETWEEN 5 AND 10080),updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS reminder_preferences(business_id TEXT NOT NULL REFERENCES businesses(id),customer_id TEXT NOT NULL REFERENCES customers(id),channel TEXT NOT NULL CHECK(channel IN('email','sms')),consented_at TEXT NOT NULL,PRIMARY KEY(business_id,customer_id,channel));
+CREATE TABLE IF NOT EXISTS appointment_reminders(id TEXT PRIMARY KEY,business_id TEXT NOT NULL REFERENCES businesses(id),appointment_id TEXT NOT NULL REFERENCES appointments(id),starts_at TEXT NOT NULL,channel TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN('processing','submitted','failed','uncertain','skipped')),provider_id TEXT,error TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(appointment_id,starts_at,channel));
+CREATE INDEX IF NOT EXISTS reminder_business ON appointment_reminders(business_id,created_at);
+CREATE TABLE IF NOT EXISTS resources(id TEXT PRIMARY KEY,business_id TEXT NOT NULL REFERENCES businesses(id),name TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN('room','equipment')),active INTEGER NOT NULL DEFAULT 1 CHECK(active IN(0,1)),created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS service_resources(business_id TEXT NOT NULL REFERENCES businesses(id),service_id TEXT NOT NULL REFERENCES services(id),resource_id TEXT NOT NULL REFERENCES resources(id),PRIMARY KEY(service_id,resource_id));
+CREATE INDEX IF NOT EXISTS service_resource_resource ON service_resources(resource_id);
+CREATE TRIGGER IF NOT EXISTS service_resource_tenant BEFORE INSERT ON service_resources BEGIN
+ SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM services s JOIN resources r ON r.id=NEW.resource_id WHERE s.id=NEW.service_id AND s.business_id=NEW.business_id AND r.business_id=NEW.business_id) THEN RAISE(ABORT,'RESOURCE_TENANT') END;
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM appointments WHERE business_id=NEW.business_id AND service_id=NEW.service_id AND status NOT IN('cancelled','no_show','completed') AND ends_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN RAISE(ABORT,'RESOURCE_EXISTING_BOOKINGS') END;
+END;
+CREATE TRIGGER IF NOT EXISTS service_resource_remove BEFORE DELETE ON service_resources BEGIN
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM appointments WHERE business_id=OLD.business_id AND service_id=OLD.service_id AND status NOT IN('cancelled','no_show','completed') AND ends_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN RAISE(ABORT,'RESOURCE_EXISTING_BOOKINGS') END;
+END;
+CREATE TRIGGER IF NOT EXISTS appointment_resources_insert BEFORE INSERT ON appointments WHEN NEW.status NOT IN('cancelled','no_show') BEGIN
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM service_resources sr JOIN resources r ON r.id=sr.resource_id WHERE sr.service_id=NEW.service_id AND sr.business_id=NEW.business_id AND r.active=0) THEN RAISE(ABORT,'RESOURCE_UNAVAILABLE') END;
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM service_resources mine JOIN service_resources other ON other.resource_id=mine.resource_id JOIN appointments a ON a.service_id=other.service_id AND a.business_id=NEW.business_id WHERE mine.service_id=NEW.service_id AND mine.business_id=NEW.business_id AND a.id<>NEW.id AND a.status NOT IN('cancelled','no_show') AND a.starts_at<NEW.ends_at AND a.ends_at>NEW.starts_at) THEN RAISE(ABORT,'RESOURCE_CONFLICT') END;
+END;
+CREATE TRIGGER IF NOT EXISTS appointment_resources_update BEFORE UPDATE OF starts_at,ends_at,service_id,status ON appointments WHEN NEW.status NOT IN('cancelled','no_show') BEGIN
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM service_resources sr JOIN resources r ON r.id=sr.resource_id WHERE sr.service_id=NEW.service_id AND sr.business_id=NEW.business_id AND r.active=0) THEN RAISE(ABORT,'RESOURCE_UNAVAILABLE') END;
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM service_resources mine JOIN service_resources other ON other.resource_id=mine.resource_id JOIN appointments a ON a.service_id=other.service_id AND a.business_id=NEW.business_id WHERE mine.service_id=NEW.service_id AND mine.business_id=NEW.business_id AND a.id<>NEW.id AND a.status NOT IN('cancelled','no_show') AND a.starts_at<NEW.ends_at AND a.ends_at>NEW.starts_at) THEN RAISE(ABORT,'RESOURCE_CONFLICT') END;
+END;

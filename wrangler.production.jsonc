@@ -1,15 +1,26 @@
 {
   "name": "maracita",
-  "main": "dist/server/index.js",
+  "main": "worker-entry.mjs",
   "compatibility_date": "2026-05-15",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": { "directory": "dist/client" },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": "dist/client"
+  },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "maracita-production",
-      "database_id": "5cb299ad-9506-4dc7-a769-92787e8190d8"
+      "database_id": "00000000-0000-4000-8000-000000000000"
     }
   ],
-  "observability": { "enabled": true }
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
 }

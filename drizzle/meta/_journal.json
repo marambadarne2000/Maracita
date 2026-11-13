@@ -29,6 +29,111 @@
       "when": 1788602185635,
       "tag": "0003_spotty_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788602186635,
+      "tag": "0004_customer_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788602187635,
+      "tag": "0005_customer_national_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788602188635,
+      "tag": "0006_feedback_surveys",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788602189635,
+      "tag": "0007_local_account_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788602190635,
+      "tag": "0008_password_resets",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788602191635,
+      "tag": "0009_reschedule_offers",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788602192635,
+      "tag": "0010_general_feedback_surveys",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1788602193635,
+      "tag": "0011_auth_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788602194635,
+      "tag": "0012_free_business_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788602195635,
+      "tag": "0013_scheduling_and_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1788602196635,
+      "tag": "0014_atomic_closures",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1788602197635,
+      "tag": "0015_inbox_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1788602198635,
+      "tag": "0016_reminders_resources",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1788602199635,
+      "tag": "0017_delivery_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1788602200635,
+      "tag": "0018_launch_readiness",
+      "breakpoints": true
     }
   ]
 }

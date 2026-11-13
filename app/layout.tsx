@@ -1,8 +1,11 @@
+import {LegalFooter} from '@/components/legal-footer';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { AuthSessionBridge } from '@/components/auth-session-bridge';
 import { I18nProvider } from '@/components/i18n-provider';
+import {ClientMonitor} from '@/components/client-monitor';
 import './globals.css';
+import './operations.css';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -50,7 +53,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <I18nProvider><AuthSessionBridge />{children}</I18nProvider>
+        <I18nProvider><AuthSessionBridge /><ClientMonitor />{children}<LegalFooter /></I18nProvider>
       </body>
     </html>
   );

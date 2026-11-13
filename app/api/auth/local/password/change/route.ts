@@ -1,0 +1,15 @@
+import {env} from 'cloudflare:workers';
+import {authenticatedIdentity} from '@/lib/auth-server';import {passwordHash,passwordMatches,randomToken,tokenHash} from '@/lib/local-auth';import {sessionHeaders} from '@/lib/session-cookie';import {consumeAuthAttempt} from '@/lib/auth-rate-limit';import {database,failure,ScheduleError} from '@/lib/scheduling';
+export async function POST(request:Request){try{
+ const value=await request.json().catch(()=>null) as {currentPassword?:unknown;password?:unknown;confirmPassword?:unknown}|null;
+ const identity=await authenticatedIdentity(request);if(!identity?.subject.startsWith('local:'))throw new ScheduleError('Please sign in.',401);
+ const accountId=identity.subject.slice(6),rate=await consumeAuthAttempt(database,'change-password:'+accountId,{limit:5,windowMinutes:15});if(!rate.allowed)return Response.json({error:'Please wait before trying to change your password again.'},{status:429,headers:{'retry-after':String(rate.retryAfterSeconds)}});
+ const current=typeof value?.currentPassword==='string'?value.currentPassword:'',password=typeof value?.password==='string'?value.password:'',confirm=value?.confirmPassword;
+ if(current.length<1||current.length>128||password.length<10||password.length>128||!/[a-zA-Z]/.test(password)||!/\d/.test(password))throw new ScheduleError('Use 10–128 characters, including a letter and a number.');if(password!==confirm)throw new ScheduleError('The passwords do not match.');if(current===password)throw new ScheduleError('Choose a different new password.');
+ const account=await database.DB.prepare('SELECT password_hash AS hash FROM accounts WHERE id=?').bind(accountId).first<{hash:string|null}>();if(!account?.hash||!await passwordMatches(current,account.hash))throw new ScheduleError('Your current password is incorrect.',401);
+ const nextHash=await passwordHash(password),token=randomToken(),hash=await tokenHash(token),now=new Date(),expires=new Date(now.getTime()+604800000).toISOString();
+ // Compare-and-swap prevents two concurrent changes from overwriting one another.
+ const changed=await database.DB.batch([database.DB.prepare('UPDATE accounts SET password_hash=?,updated_at=? WHERE id=? AND password_hash=?').bind(nextHash,now.toISOString(),accountId,account.hash),database.DB.prepare('DELETE FROM auth_sessions WHERE account_id=? AND EXISTS(SELECT 1 FROM accounts WHERE id=? AND password_hash=?)').bind(accountId,accountId,nextHash),database.DB.prepare('INSERT INTO auth_sessions(id,account_id,token_hash,expires_at,created_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM accounts WHERE id=? AND password_hash=?)').bind(crypto.randomUUID(),accountId,hash,expires,now.toISOString(),accountId,nextHash)]);
+ if(!changed[0].meta.changes)throw new ScheduleError('Your password changed in another request. Sign in again.',409);
+ return Response.json({ok:true,cookieSession:true,...(request.headers.get('x-maracita-browser')==='1'?{}:{access_token:token})},{headers:sessionHeaders(request,token)});
+ }catch(error){return failure(error);}}

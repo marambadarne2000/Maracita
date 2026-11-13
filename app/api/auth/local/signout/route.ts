@@ -1,5 +1,2 @@
-import { env } from 'cloudflare:workers';
-import type { MaracitaRuntime } from '@/db/client';
-import { removeSession } from '@/lib/local-auth';
-const database = env as unknown as MaracitaRuntime;
-export async function POST(request: Request) { const token = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]; if (token) await removeSession(database, token); return Response.json({ ok: true }); }
+import {env} from 'cloudflare:workers';import type {MaracitaRuntime} from '@/db/client';import {removeSession} from '@/lib/local-auth';import {assertSameOrigin,requestToken,sessionHeaders} from '@/lib/session-cookie';import {failure} from '@/lib/scheduling';
+export async function POST(request:Request){try{await assertSameOrigin(request);await request.arrayBuffer().catch(()=>{});const token=requestToken(request);if(token)await removeSession(env as unknown as MaracitaRuntime,token);return Response.json({ok:true},{headers:sessionHeaders(request,'',true)});}catch(e){return failure(e);}}

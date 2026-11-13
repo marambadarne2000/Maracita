@@ -1,87 +1,69 @@
 # Maracita
 
-**Maracita** is an appointment operations platform for service businesses. It brings customer relationships, booking flow, payments, team schedules and follow-up signals into one private workspace.
+Appointment and customer management by **Maram Abbas**. English is the default language, with Hebrew and Arabic interfaces and right-to-left layouts.
 
-Built by **Maram Abbas**.
+## Implemented features
 
-> This repository is a portfolio-ready product build. It intentionally contains no customer data, API keys, payment credentials or provider secrets.
+- Free business registration, local password sign-in, business-scoped workspaces, HttpOnly sessions and password-change/recovery routes.
+- Day/week/month calendar, staff columns, drag-to-reschedule, inline customer creation and overlapping-booking prevention.
+- Business/staff hours, closures, buffers, room/equipment availability and public booking/management links.
+- Customer records, services, local payment/receipt records, comparative reports, waitlists and cancellation offers.
+- Unified inbox, private notes/attachments, signed incoming webhooks, delivery events and duplicate-event protection.
+- Encrypted provider settings, system Gmail OAuth, separate business Resend connections and optional AI drafting.
+- Privacy/terms pages, operator Launch Center, health endpoint, operational events and encrypted local backup tools.
+- WhatsApp sandbox and Twilio Trial configuration: manual tests, recipient allowlists, expiry, rate limits and replay protection.
 
-## What it does
+These are implemented code paths, not a claim that all external services are connected or that the product is ready for public launch.
 
-- Creates a private workspace for each business.
-- Manages customers, staff members, services and availability.
-- Creates appointments and prevents staff scheduling conflicts.
-- Tracks appointment states: scheduled, confirmed, arrived, completed, cancelled and no-show.
-- Keeps customer history in a Customer 360 profile: appointments, payments, receipts, messages and feedback.
-- Records local payment plans and generates receipt records.
-- Uses a waitlist and **Smart Rescue** queue to turn cancellations and incomplete tasks into follow-up actions.
-- Shows a Journey Timeline from booking to feedback.
-- Provides analytics, a searchable communication workspace, file attachments and customer feedback surveys.
+## Integration limits
 
-## Product direction
+Gmail recovery needs valid OAuth credentials, account-owner consent and real delivery verification. Resend test senders cannot support public recovery or unrestricted customer email. Business messages use a separate business connection.
 
-Maracita is designed as a multi-tenant SaaS for clinics, beauty and wellness studios, consultants, fitness businesses, auto services and other appointment-led teams. The project focuses on calm operational UX: the most important next action should be visible without turning the day into a noisy dashboard.
+WhatsApp requires a Meta test number positively identified as SANDBOX. SMS requires an active parent Twilio Trial account. Both phone channels permit only manual tests to configured, provider-verified recipients. Automated phone reminders/offers and paid accounts are blocked. Trial eligibility, regions, templates, quotas and expiry remain controlled by the providers. This code does not create or upgrade provider accounts or activate billing. AI and Instagram require their own optional configuration. Local payment records do not charge cards or transfer money.
 
-## Tech stack
+## Stack
 
-- React 19 + Vinext / Vite
-- TypeScript
-- Cloudflare Workers + D1 (local development)
-- Drizzle ORM and SQL migrations
-- Supabase Auth integration
-- Tailwind CSS and shadcn-style UI primitives
+React 19, TypeScript, Vinext/Vite, Cloudflare Workers/D1, Drizzle SQL migrations, Tailwind CSS and shadcn-style components. Sign-in uses local application accounts; Supabase is optional legacy configuration.
 
 ## Local setup
 
-### Requirements
-
-- Node.js 22 or newer
-- A Supabase project only if you want to test the real email-and-password flow
-
-### Run locally
+Use **Node.js 24 or newer**:
 
 ```bash
-npm install
+npm ci
+npm run setup:local
+npm run check:types
+node scripts/check-migrations.mjs
+npm run test:regression
 npm run build
 npm run db:migrate:local
-npm run start
+npm start
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000`. Setup creates an ignored `.dev.vars` with independent random encryption, background-job and backup keys; it does not print values or overwrite an existing file. `.env.example` lists safe configuration names only. Never upload actual credentials, backups or database files.
 
-For real authentication, copy `.env.example` to `.dev.vars` (on Windows: `Copy-Item .env.example .dev.vars`) and add `SUPABASE_URL` plus `SUPABASE_PUBLISHABLE_KEY`.
+For a new database, run all migrations once. Preserve existing data before upgrades: `db:upgrade` covers only the advanced-operation migration range, not all historical migrations. State lives under `.wrangler/state`. Registration does not require Gmail, Resend, Supabase, a payment card or a paid provider. Email delivery still requires a configured sender.
 
-### Portfolio demo
+`/demo` uses fictional data; it does not prove real delivery. To manage operator-only tools locally, register an account and set its ID as `LAUNCH_ADMIN_ACCOUNT_ID` in `.dev.vars`, then restart.
 
-Open `http://localhost:3000/demo` after the local migration, or choose **Explore the portfolio demo** from the landing page. It creates fictional records in a local demo workspace, so reviewers can explore the full product without Supabase credentials, an account, or any personal data.
+## Verification and QA
 
-## Database
+GitHub Actions runs lockfile installation, TypeScript checks, in-memory migration validation, 62 isolated communication/security assertions and a production build. Provider calls are mocked; fixtures contain no customer data.
 
-The D1 schema lives in [`drizzle/`](./drizzle). Run the ordered SQL migrations against your own local or deployed D1 database before using the application with data.
+- [Regression checks](qa/regression/README.md)
+- [Manual QA plan and artifacts](qa/manual/TEST_PLAN.md)
+- [Separate Java/Selenium example](qa/selenium-java/README.md)
+- [Calendar and communication architecture](docs/ADVANCED-OPERATIONS.md)
+- [Launch operations](docs/LAUNCH-RUNBOOK.md)
+- [Source synchronization notes](docs/SOURCE-SYNC-2026-11-13.md)
+- [Security](SECURITY.md)
 
-## Current scope and production roadmap
+Historical audit documents refer to their stated dates and environments; they are not current production certifications. The Java/Selenium example is separate from the Node build/regression pipeline.
 
-The product workflow and data model are implemented. These integrations are deliberately not represented as live until real accounts and credentials are configured:
+## Hosting
 
-- Card processing and subscription billing
-- Transactional email, SMS and WhatsApp delivery
-- A production domain and SMTP sender identity
-- Production-level rate limiting, MFA, backups, monitoring and formal privacy documents
-
-See [`docs/PORTFOLIO.md`](./docs/PORTFOLIO.md) for a portfolio walkthrough and [`SECURITY.md`](./SECURITY.md) for safe contribution rules.
-
-## Verification
-
-```bash
-npm run build
-```
-
-GitHub Actions runs this build on every push and pull request.
-
-## Browser automation
-
-The repository includes a Selenium + Java WebDriver test example in [`qa/selenium-java`](./qa/selenium-java), alongside separate manual QA test cases and report templates in [`qa/manual`](./qa/manual). They are portfolio artifacts: the Selenium suite is intentionally not run automatically by the application CI.
+`.openai/hosting.json` contains only local DB/R2 binding declarations. Production Site identity, secrets, customer state and local build output are excluded. `wrangler.production.jsonc` has a placeholder D1 ID: replace it with your own deployment database before deploying. Updating this repository does not automatically change the hosted Site.
 
 ## License
 
-Copyright © 2026 Maram Abbas. All rights reserved. This repository is shared for portfolio review only; reuse, redistribution and commercial use require written permission.
+Copyright 2026 Maram Abbas. All rights reserved. Shared for portfolio review; reuse, redistribution and commercial use require written permission.

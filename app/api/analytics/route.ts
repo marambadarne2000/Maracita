@@ -1,34 +1,12 @@
-import { env } from 'cloudflare:workers';
-import type { MaracitaRuntime } from '@/db/client';
-import { authenticatedIdentity } from '@/lib/auth-server';
-
-const database = env as unknown as MaracitaRuntime;
-
-async function business(request: Request) {
-  const identity = await authenticatedIdentity(request);
-  if (!identity) return null;
-  return database.DB.prepare('SELECT b.id, b.currency FROM businesses b INNER JOIN memberships m ON m.business_id = b.id INNER JOIN accounts a ON a.id = m.account_id WHERE a.auth_subject = ? ORDER BY b.created_at DESC LIMIT 1').bind(identity.subject).first<{ id: string; currency: string }>();
-}
-
-export async function GET(request: Request) {
-  const workspace = await business(request);
-  if (!workspace) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const [customers, staff, appointmentStats, payments, signals, daily] = await database.DB.batch([
-    database.DB.prepare('SELECT COUNT(*) AS count FROM customers WHERE business_id = ?').bind(workspace.id),
-    database.DB.prepare('SELECT COUNT(*) AS count FROM staff WHERE business_id = ? AND active = 1').bind(workspace.id),
-    database.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status IN ('scheduled', 'confirmed') THEN 1 ELSE 0 END) AS active, SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled, SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed FROM appointments WHERE business_id = ?").bind(workspace.id),
-    database.DB.prepare("SELECT COALESCE(SUM(amount_agorot), 0) AS revenueMinor, COUNT(*) AS count FROM payments WHERE business_id = ? AND status = 'paid'").bind(workspace.id),
-    database.DB.prepare('SELECT COUNT(*) AS count FROM schedule_signals WHERE business_id = ? AND resolved_at IS NULL').bind(workspace.id),
-    database.DB.prepare("SELECT substr(starts_at, 1, 10) AS date, COUNT(*) AS count FROM appointments WHERE business_id = ? GROUP BY substr(starts_at, 1, 10) ORDER BY date DESC LIMIT 7").bind(workspace.id),
-  ]);
-  const first = <T,>(result: D1Result<unknown>) => result.results[0] as T | undefined;
-  return Response.json({
-    currency: workspace.currency,
-    metrics: {
-      customers: Number(first<{ count?: number }>(customers)?.count ?? 0), staff: Number(first<{ count?: number }>(staff)?.count ?? 0),
-      totalAppointments: Number(first<{ total?: number }>(appointmentStats)?.total ?? 0), activeAppointments: Number(first<{ active?: number }>(appointmentStats)?.active ?? 0), cancelledAppointments: Number(first<{ cancelled?: number }>(appointmentStats)?.cancelled ?? 0), completedAppointments: Number(first<{ completed?: number }>(appointmentStats)?.completed ?? 0),
-      revenueMinor: Number(first<{ revenueMinor?: number }>(payments)?.revenueMinor ?? 0), paymentCount: Number(first<{ count?: number }>(payments)?.count ?? 0), openSignals: Number(first<{ count?: number }>(signals)?.count ?? 0),
-    },
-    daily: daily.results,
-  });
-}
+import { addDays,currentBusiness,database,dateParts,failure,localInstant,range } from '@/lib/scheduling';
+type Appointment={startsAt:string;status:string;staffId:string;staffName:string;serviceName:string;customerId:string};
+type Payment={amount:number;paidAt:string};
+export async function GET(request:Request){try{const business=await currentBusiness(request),url=new URL(request.url),today=dateParts(new Date(),business.timezone).date,from=url.searchParams.get('from')||today.slice(0,7)+'-01',to=url.searchParams.get('to')||today;range(from,to,365);const days=Math.round((Date.parse(to)-Date.parse(from))/86400000)+1,previousFrom=addDays(from,-days),previousTo=addDays(from,-1);const start=localInstant(from,0,business.timezone),end=localInstant(addDays(to,1),0,business.timezone),previousStart=localInstant(previousFrom,0,business.timezone);
+ const queryAppointments=(start:string,end:string)=>database.DB.prepare("SELECT a.starts_at AS startsAt,a.status,a.staff_id AS staffId,s.full_name AS staffName,sv.name AS serviceName,a.customer_id AS customerId FROM appointments a JOIN staff s ON s.id=a.staff_id JOIN services sv ON sv.id=a.service_id WHERE a.business_id=? AND a.starts_at>=? AND a.starts_at<?").bind(business.id,start,end);
+ const queryPayments=(start:string,end:string)=>database.DB.prepare("SELECT amount_agorot AS amount,COALESCE(paid_at,created_at) AS paidAt FROM payments WHERE business_id=? AND status='paid' AND COALESCE(paid_at,created_at)>=? AND COALESCE(paid_at,created_at)<?").bind(business.id,start,end);
+ const result=await database.DB.batch([queryAppointments(start,end),queryPayments(start,end),queryAppointments(previousStart,start),queryPayments(previousStart,start)]);const appointments=result[0].results as Appointment[],payments=result[1].results as Payment[],previousAppointments=result[2].results as Appointment[],previousPayments=result[3].results as Payment[];
+ const summarize=(appointments:Appointment[],payments:Payment[])=>({totalAppointments:appointments.length,activeAppointments:appointments.filter(row=>['scheduled','confirmed','arrived'].includes(row.status)).length,cancelledAppointments:appointments.filter(row=>row.status==='cancelled').length,completedAppointments:appointments.filter(row=>row.status==='completed').length,noShows:appointments.filter(row=>row.status==='no_show').length,revenueMinor:payments.reduce((sum,row)=>sum+row.amount,0),paymentCount:payments.length,customers:new Set(appointments.map(row=>row.customerId)).size,staff:new Set(appointments.map(row=>row.staffId)).size});
+ const metrics=summarize(appointments,payments),previous=summarize(previousAppointments,previousPayments);const change=(current:number,old:number)=>old?Math.round((current-old)/old*1000)/10:null;
+ const daily=Array.from({length:days},(_,index)=>({date:addDays(from,index),count:0,revenueMinor:0}));const dates=new Map(daily.map(row=>[row.date,row]));for(const row of appointments){const value=dates.get(dateParts(row.startsAt,business.timezone).date);if(value)value.count++;}for(const row of payments){const value=dates.get(dateParts(row.paidAt,business.timezone).date);if(value)value.revenueMinor+=row.amount;}
+ const team=new Map<string,{name:string;bookings:number;completed:number}>(),services=new Map<string,number>(),statuses=new Map<string,number>();for(const row of appointments){const member=team.get(row.staffId)||{name:row.staffName,bookings:0,completed:0};member.bookings++;if(row.status==='completed')member.completed++;team.set(row.staffId,member);services.set(row.serviceName,(services.get(row.serviceName)||0)+1);statuses.set(row.status,(statuses.get(row.status)||0)+1);}
+ return Response.json({currency:business.currency,timezone:business.timezone,period:{from,to,days,previousFrom,previousTo},metrics,previous,changes:{bookings:change(metrics.totalAppointments,previous.totalAppointments),revenue:change(metrics.revenueMinor,previous.revenueMinor),customers:change(metrics.customers,previous.customers)},daily,team:[...team.values()].sort((a,b)=>b.bookings-a.bookings),services:[...services].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),statuses:[...statuses].map(([name,count])=>({name,count}))});}catch(error){return failure(error);}}

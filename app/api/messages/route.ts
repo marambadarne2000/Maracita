@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { MaracitaRuntime } from '@/db/client';
 import { authenticatedIdentity } from '@/lib/auth-server';
-import { sendEmail } from '@/lib/email';
+
 
 const database = env as unknown as MaracitaRuntime;
 
@@ -26,31 +26,5 @@ export async function GET(request: Request) {
   return Response.json({ customers: customers.results, messages: messages.results, appointments: appointments.results });
 }
 
-export async function POST(request: Request) {
-  const business = await workspace(request);
-  if (!business) return Response.json({ error: 'Create a workspace first.' }, { status: 401 });
-  const body = await request.json().catch(() => ({})) as { customerId?: unknown; message?: unknown; attachment?: unknown; delivery?: unknown; subject?: unknown };
-  const customerId = typeof body.customerId === 'string' ? body.customerId : '';
-  const message = typeof body.message === 'string' ? body.message.trim().slice(0, 5000) : '';
-  const delivery = body.delivery === 'email' ? 'email' : 'internal';
-  const subject = typeof body.subject === 'string' ? body.subject.trim().slice(0, 180) : '';
-  const attachment = body.attachment && typeof body.attachment === 'object' ? body.attachment as { name?: unknown; type?: unknown; data?: unknown } : null;
-  const name = typeof attachment?.name === 'string' ? attachment.name.slice(0, 160) : null;
-  const type = typeof attachment?.type === 'string' ? attachment.type.slice(0, 120) : null;
-  const data = typeof attachment?.data === 'string' ? attachment.data : null;
-  if (!customerId || (!message && !data)) return Response.json({ error: 'Choose a customer and add a message or file.' }, { status: 400 });
-  if (delivery === 'email' && (!message || subject.length < 3)) return Response.json({ error: 'Write a detailed email message and subject before sending.' }, { status: 400 });
-  if (data && (data.length > 1_400_000 || !data.startsWith('data:'))) return Response.json({ error: 'File is too large. Upload a file up to 1 MB.' }, { status: 400 });
-  const customer = await database.DB.prepare("SELECT id, email, first_name AS firstName, last_name AS lastName FROM customers WHERE id = ? AND business_id = ?").bind(customerId, business.id).first<{ id: string; email: string | null; firstName: string; lastName: string }>();
-  if (!customer) return Response.json({ error: 'Customer is not available.' }, { status: 400 });
-  if (delivery === 'email' && !customer.email) return Response.json({ error: 'Add an email address to this customer before sending an email.' }, { status: 400 });
-  const now = new Date().toISOString(); const id = crypto.randomUUID();
-  await database.DB.prepare('INSERT INTO customer_messages (id, business_id, customer_id, author_type, body, attachment_name, attachment_type, attachment_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, business.id, customerId, delivery === 'email' ? 'business_email' : 'business', message, name, type, data, now).run();
-  if (delivery === 'email') {
-    const businessName = await database.DB.prepare('SELECT name FROM businesses WHERE id = ?').bind(business.id).first<{ name: string }>();
-    const personalized = `Hello ${customer.firstName},\n\n${message}\n\n— ${businessName?.name || 'Maracita'}`;
-    const result = await sendEmail(customer.email as string, subject, personalized);
-    if (!result.ok) return Response.json({ error: `${result.error} Your note was saved privately, but no email was sent.` }, { status: 502 });
-  }
-  return Response.json({ id, delivered: delivery === 'email' }, { status: 201 });
-}
+export async function POST(request:Request){try{const d=await request.json() as Record<string,unknown>;if(!d||typeof d!=='object')return Response.json({error:'Enter a valid message.'},{status:400});const {POST:send}=await import('@/app/api/inbox/route');const forward=(value:unknown)=>new Request(request.url,{method:'POST',headers:request.headers,body:JSON.stringify(value)});const opened=await send(forward({action:'new',customerId:d.customerId,channel:d.delivery==='email'?'email':'internal'}));const thread=await opened.json() as {id?:string;error?:string};if(!opened.ok)return Response.json(thread,{status:opened.status});const sent=await send(forward({conversationId:thread.id,message:d.message,attachment:d.attachment,subject:d.subject,requestId:typeof d.requestId==='string'?d.requestId:crypto.randomUUID()}));const result=await sent.json() as Record<string,unknown>;return Response.json({...result,delivered:false,submitted:result.status==='sent',note:result.status==='saved'?'Saved privately; not sent to the customer.':'Provider acceptance is not delivery confirmation.'},{status:sent.ok?201:sent.status});}catch{return Response.json({error:'The message could not be processed.'},{status:400});}}
+

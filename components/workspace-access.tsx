@@ -1,4 +1,5 @@
 'use client';
+import {translateLabel,uiLocale} from '@/lib/ui-translate';
 
 import { useEffect, useState } from 'react';
 import { LogOut } from 'lucide-react';
@@ -15,22 +16,23 @@ const leaveLabels = {
   es: { leave: 'Cerrar sesión', leaving: 'Cerrando sesión…', opening: 'Abriendo tu espacio seguro…' },
 };
 
-export function WorkspaceAccess({ children }: { children: React.ReactNode }) {
+export function WorkspaceAccess({ children,operatorPage=false }: { children: React.ReactNode;operatorPage?:boolean }) {
   const [checking, setChecking] = useState(true);
   const [hasSession, setHasSession] = useState(false);
   const { locale } = useI18n();
 
   useEffect(() => {
-    setHasSession(Boolean(getSession()?.access_token));
+    setHasSession(Boolean(getSession()?.access_token||getSession()?.cookieSession));
     setChecking(false);
   }, []);
 
+  if(operatorPage)return <>{children}</>;
   if (checking) {
     return <main className="grid min-h-screen place-items-center bg-[#07111f] text-sm text-[#a9bad0]">{leaveLabels[locale].opening}</main>;
   }
 
   if (!hasSession) {
-    return <main className="grid min-h-screen place-items-center bg-[#07111f] px-5 text-white"><section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#101c30] p-7 shadow-2xl shadow-black/30"><p className="text-xs font-bold tracking-[.16em] text-[#c9f66b]">MARACITA ACCESS</p><h1 className="mt-3 text-3xl font-black">Choose how to enter</h1><p className="mt-3 leading-6 text-[#a9bad0]">Explore a complete fictional workspace instantly, or sign in to your own workspace.</p><div className="mt-7 grid gap-3"><a href="/demo" className="rounded-xl bg-[#c9f66b] px-4 py-3 text-center font-bold text-[#10120d] hover:bg-[#ddff96]">Explore portfolio demo</a><a href="/?signin=1" className="rounded-xl border border-white/15 px-4 py-3 text-center font-semibold text-white hover:bg-white/8">Sign in to my workspace</a></div></section></main>;
+    return <main className="grid min-h-screen place-items-center bg-[#07111f] px-5 text-white"><section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#101c30] p-7 shadow-2xl shadow-black/30"><p className="text-xs font-bold tracking-[.16em] text-[#c9f66b]">{translateLabel("MARACITA ACCESS")}</p><h1 className="mt-3 text-3xl font-black">{translateLabel("Choose how to enter")}</h1><p className="mt-3 leading-6 text-[#a9bad0]">{translateLabel("Explore a complete fictional workspace instantly, or sign in to your own workspace.")}</p><div className="mt-7 grid gap-3"><a href="/demo" className="rounded-xl bg-[#c9f66b] px-4 py-3 text-center font-bold text-[#10120d] hover:bg-[#ddff96]">{translateLabel("Explore portfolio demo")}</a><a href="/?signin=1" className="rounded-xl border border-white/15 px-4 py-3 text-center font-semibold text-white hover:bg-white/8">{translateLabel("Sign in to my workspace")}</a></div></section></main>;
   }
 
   return <>{children}</>;

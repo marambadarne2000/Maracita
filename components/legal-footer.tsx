@@ -1,0 +1,3 @@
+"use client";
+import {useI18n} from '@/components/i18n-provider';
+export function LegalFooter(){const {locale}=useI18n();const labels=locale==='he'?['פרטיות','תנאי שימוש','תמיכה']:locale==='ar'?['الخصوصية','شروط الاستخدام','الدعم']:['Privacy','Terms','Support'];return <div className="border-t border-white/10 bg-[#091324] px-5 py-6 pb-28 text-center text-xs text-slate-300"><a href="/privacy" className="mx-3">{labels[0]}</a><a href="/terms" className="mx-3">{labels[1]}</a><a href="mailto:maram.software.tech@gmail.com" className="mx-3">{labels[2]}</a><span className="mt-3 block" dir="ltr">Created by Maram Abbas</span></div>}

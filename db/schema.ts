@@ -28,7 +28,7 @@ export const businesses = sqliteTable('businesses', {
   phone: text('phone').notNull(),
   timezone: text('timezone').notNull().default('UTC'),
   currency: text('currency').notNull().default('USD'),
-  status: text('status').notNull().default('trial'),
+  status: text('status').notNull().default('active'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (table) => [
@@ -49,7 +49,7 @@ export const subscriptions = sqliteTable('subscriptions', {
   id: id('id'),
   businessId: text('business_id').notNull().unique().references(() => businesses.id),
   planCode: text('plan_code').notNull(),
-  status: text('status').notNull().default('trialing'),
+  status: text('status').notNull().default('active'),
   trialEndsAt: text('trial_ends_at'),
   currentPeriodEndsAt: text('current_period_ends_at'),
   paymentProviderCustomerId: text('payment_provider_customer_id'),
@@ -236,3 +236,67 @@ export const customerMessages = sqliteTable('customer_messages', {
 }, (table) => [
   index('idx_customer_messages_business_customer_date').on(table.businessId, table.customerId, table.createdAt),
 ]);
+
+export const businessCredentials = sqliteTable('business_credentials', {
+  businessId: text('business_id').primaryKey().references(() => businesses.id),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  businessNumber: text('business_number').notNull().unique(),
+  ownerIdHash: text('owner_id_hash').notNull(),
+  city: text('city').notNull().default(''),
+  address: text('address').notNull().default(''),
+  createdAt: createdAt(),
+});
+export const businessTasks = sqliteTable('business_tasks', {
+  id: id('id'), businessId: text('business_id').notNull().references(() => businesses.id),
+  title: text('title').notNull(), dueDate: text('due_date'), completed: integer('completed').notNull().default(0), createdAt: createdAt(),
+});
+
+
+export const bookingSettings = sqliteTable('booking_settings', {
+ businessId: text('business_id').primaryKey().references(() => businesses.id), slug: text('slug').notNull().unique(),
+ publicEnabled: integer('public_enabled').notNull().default(0), leadMinutes: integer('lead_minutes').notNull().default(60),
+ horizonDays: integer('horizon_days').notNull().default(90), slotInterval: integer('slot_interval').notNull().default(15),
+ autoFill: integer('auto_fill').notNull().default(0), offerMinutes: integer('offer_minutes').notNull().default(15),
+ offerChannel: text('offer_channel').notNull().default('email'), updatedAt: updatedAt(),
+});
+export const staffHours = sqliteTable('staff_hours', {
+ id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),staffId:text('staff_id').notNull().references(()=>staff.id),
+ weekday:integer('weekday').notNull(),startMinute:integer('start_minute').notNull(),endMinute:integer('end_minute').notNull(),closed:integer('closed').notNull().default(0),
+},table=>[uniqueIndex('uq_staff_hours_business_staff_weekday').on(table.businessId,table.staffId,table.weekday)]);
+export const timeOff = sqliteTable('time_off', {
+ id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),staffId:text('staff_id').references(()=>staff.id),
+ startsAt:text('starts_at').notNull(),endsAt:text('ends_at').notNull(),reason:text('reason').notNull().default(''),createdAt:createdAt(),
+},table=>[index('idx_time_off_range').on(table.businessId,table.startsAt,table.endsAt)]);
+export const publicBookingTokens = sqliteTable('public_booking_tokens', {
+ id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),appointmentId:text('appointment_id').notNull().unique().references(()=>appointments.id),tokenHash:text('token_hash').notNull().unique(),createdAt:createdAt(),
+});
+export const waitlistOffers = sqliteTable('waitlist_offers', {
+ id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),sourceAppointmentId:text('source_appointment_id').notNull().references(()=>appointments.id),
+ waitlistId:text('waitlist_id').notNull().references(()=>waitlistEntries.id),customerId:text('customer_id').notNull().references(()=>customers.id),staffId:text('staff_id').notNull().references(()=>staff.id),serviceId:text('service_id').notNull().references(()=>services.id),
+ startsAt:text('starts_at').notNull(),endsAt:text('ends_at').notNull(),tokenHash:text('token_hash').notNull().unique(),status:text('status').notNull().default('pending'),expiresAt:text('expires_at').notNull(),
+ deliveryStatus:text('delivery_status').notNull().default('pending'),channel:text('channel').notNull(),appointmentId:text('appointment_id').references(()=>appointments.id),createdAt:createdAt(),
+},table=>[uniqueIndex('uq_waitlist_source_entry').on(table.sourceAppointmentId,table.waitlistId),index('idx_waitlist_offers_status').on(table.businessId,table.status,table.expiresAt)]);
+export const integrations = sqliteTable('integrations', {
+ id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),channel:text('channel').notNull(),externalAccountId:text('external_account_id').notNull().default(''),displayName:text('display_name').notNull().default(''),encryptedConfig:text('encrypted_config').notNull(),enabled:integer('enabled').notNull().default(1),createdAt:createdAt(),updatedAt:updatedAt(),
+},table=>[uniqueIndex('uq_integration_business_channel').on(table.businessId,table.channel)]);
+export const inboxConversations = sqliteTable('inbox_conversations', {
+ id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),connectionId:text('connection_id').references(()=>integrations.id),customerId:text('customer_id').references(()=>customers.id),channel:text('channel').notNull(),externalContactId:text('external_contact_id').notNull(),contactName:text('contact_name').notNull(),unreadCount:integer('unread_count').notNull().default(0),lastMessageAt:text('last_message_at').notNull(),
+},table=>[uniqueIndex('uq_inbox_business_channel_contact').on(table.businessId,table.channel,table.externalContactId)]);
+export const inboxMessages = sqliteTable('inbox_messages', {
+ id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),conversationId:text('conversation_id').notNull().references(()=>inboxConversations.id),direction:text('direction').notNull(),body:text('body').notNull(),deliveryStatus:text('delivery_status').notNull(),providerMessageId:text('provider_message_id'),error:text('error'),createdAt:createdAt(),
+},table=>[index('idx_inbox_messages_conversation').on(table.businessId,table.conversationId,table.createdAt)]);
+export const integrationEvents = sqliteTable('integration_events', {
+ connectionId:text('connection_id').notNull().references(()=>integrations.id),eventId:text('event_id').notNull(),createdAt:createdAt(),
+},table=>[primaryKey({columns:[table.connectionId,table.eventId]})]);
+
+export const inboxAttachments=sqliteTable('inbox_attachments',{
+ messageId:text('message_id').primaryKey().references(()=>inboxMessages.id),businessId:text('business_id').notNull().references(()=>businesses.id),name:text('name').notNull(),mimeType:text('mime_type').notNull(),data:text('data').notNull(),
+},table=>[index('idx_inbox_attachments_business').on(table.businessId)]);
+
+export const reminderSettings=sqliteTable('reminder_settings',{businessId:text('business_id').primaryKey().references(()=>businesses.id),enabled:integer('enabled').notNull().default(0),channel:text('channel').notNull().default('email'),leadMinutes:integer('lead_minutes').notNull().default(1440),updatedAt:updatedAt()});
+export const reminderPreferences=sqliteTable('reminder_preferences',{businessId:text('business_id').notNull().references(()=>businesses.id),customerId:text('customer_id').notNull().references(()=>customers.id),channel:text('channel').notNull(),consentedAt:text('consented_at').notNull()},t=>[primaryKey({columns:[t.businessId,t.customerId,t.channel]})]);
+export const appointmentReminders=sqliteTable('appointment_reminders',{id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),appointmentId:text('appointment_id').notNull().references(()=>appointments.id),startsAt:text('starts_at').notNull(),channel:text('channel').notNull(),status:text('status').notNull(),providerId:text('provider_id'),error:text('error'),createdAt:createdAt(),updatedAt:updatedAt()},t=>[uniqueIndex('uq_reminder_appointment_time_channel').on(t.appointmentId,t.startsAt,t.channel)]);
+export const resources=sqliteTable('resources',{id:id('id'),businessId:text('business_id').notNull().references(()=>businesses.id),name:text('name').notNull(),kind:text('kind').notNull(),active:integer('active').notNull().default(1),createdAt:createdAt()});
+export const serviceResources=sqliteTable('service_resources',{businessId:text('business_id').notNull().references(()=>businesses.id),serviceId:text('service_id').notNull().references(()=>services.id),resourceId:text('resource_id').notNull().references(()=>resources.id)},t=>[primaryKey({columns:[t.serviceId,t.resourceId]})]);
+
+export const providerDeliveryEvents=sqliteTable('provider_delivery_events',{connectionId:text('connection_id').notNull().references(()=>integrations.id),businessId:text('business_id').notNull().references(()=>businesses.id),eventId:text('event_id').notNull(),providerMessageId:text('provider_message_id').notNull(),status:text('status').notNull(),occurredAt:text('occurred_at').notNull(),createdAt:createdAt()},t=>[primaryKey({columns:[t.connectionId,t.eventId]}),index('provider_delivery_lookup').on(t.connectionId,t.providerMessageId,t.occurredAt)]);

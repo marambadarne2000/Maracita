@@ -41,7 +41,14 @@ next-env.d.ts
 /dist/
 /.wrangler/
 /outputs/
+/.backups/
+/launch-artifacts/
 /work/
 
 # Never commit production deployment secrets.
 .deploy-secrets*
+
+# Safe template and generated checks
+!.env.example
+*.tsbuildinfo
+/qa/regression/results/
